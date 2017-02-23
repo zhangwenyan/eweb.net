@@ -25,6 +25,8 @@ namespace Web.handler
         {
             var req = context.Request;
             var url = req.Url.ToString();
+        
+
             var controllerName = req.Url.AbsolutePath.Substring(1) + "Controller";
             String action = req["action"] ?? "main";
 
@@ -70,33 +72,10 @@ namespace Web.handler
                 {
                     ps[i] = context.Response;
                 }
-                else if (type.Equals(typeof(PageInfo<>)))
-                {
-
-
-                }
-                else if (type.IsSubclassOf(typeof(BaseModel)))
-                {
-                    var props = type.GetProperties();
-                    var t = Activator.CreateInstance(type);
-                    foreach(var prop in props)
-                    {
-                        String valStr = req[prop.Name];
-                        if (valStr!=null)
-                        {
-                            if(valStr=="" &&!prop.PropertyType.Equals(typeof(String)))
-                            {
-                                continue;
-                            }
-                            prop.SetValue(t, Convert.ChangeType(valStr, prop.PropertyType), null);
-                        }
-                    }
-                    ps[i] = t;
-                }
-                else
+                else if (type.IsValueType || type.Equals(typeof(String)))
                 {
                     String valueStr = req[p.Name];
-                    if (valueStr!=null)
+                    if (valueStr != null)
                     {
                         if (valueStr == "" && !type.Equals(typeof(String)))
                         {
@@ -105,6 +84,48 @@ namespace Web.handler
 
                         ps[i] = Convert.ChangeType(valueStr, type);
                     }
+                }
+                else
+                {
+                    var props = type.GetProperties();
+                    var t = Activator.CreateInstance(type);
+                    foreach(var prop in props)
+                    {
+                        if (prop.PropertyType.IsValueType || prop.PropertyType.Equals(typeof(String)))
+                        {
+                            String valStr = req[prop.Name];
+                            if (valStr != null)
+                            { 
+                                if (valStr == "" && !prop.PropertyType.Equals(typeof(String)))
+                                {
+                                    continue;
+                                }
+                                prop.SetValue(t, Convert.ChangeType(valStr, prop.PropertyType), null);
+                            }
+                        }
+                        else
+                        {
+                            var props1 = prop.PropertyType.GetProperties();
+                            var t1 = Activator.CreateInstance(prop.PropertyType);
+                            foreach (var prop1 in props1)
+                            {
+
+                                String valStr = req[prop1.Name];
+                                if (valStr != null)
+                                {
+                                    if (valStr == "" && !prop.PropertyType.Equals(typeof(String)))
+                                    {
+                                        continue;
+                                    }
+                                    prop1.SetValue(t1, Convert.ChangeType(valStr, prop1.PropertyType), null);
+                                }
+                            }
+                            prop.SetValue(t, t1, null);
+
+                       }
+                       
+                    }
+                    ps[i] = t;
                 }
             }
             var result = method.Invoke(controller, ps);
